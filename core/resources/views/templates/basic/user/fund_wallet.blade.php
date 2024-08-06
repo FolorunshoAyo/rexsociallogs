@@ -21,8 +21,8 @@
                                 <option value>
                                     Select Payment Method
                                 </option>
-                                <option value="109">
-                                    Flutterwave
+                                <option value="107">
+                                    Paystack
                                 </option>
                             </select>
                         </div>
