@@ -14,7 +14,7 @@ class WalletHistory extends Model
     protected $table = 'wallet_history';
     
     protected $fillable = [
-        'wallet_id', 'order_id', 'transaction_type', 'final_amo', 'amount', 'status', 'created_at', 'updated_at'
+        'wallet_id', 'order_id', 'transaction_type', 'final_amo', 'amount', 'status', 'admin_feedback', 'created_at', 'updated_at'
     ];
 
     public function user()

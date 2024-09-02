@@ -24,6 +24,9 @@
                                 <option value="107">
                                     Paystack
                                 </option>
+                                <option value="1000">
+                                    Manual
+                                </option>
                             </select>
                         </div>
                         <div class="form-group">

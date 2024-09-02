@@ -77,7 +77,8 @@ class PaymentController extends Controller
             <option value="wallet" data-gateway="{\'currency\': \'NGN\'}">Pay with wallet (Balance: NGN' . number_format($userWallet->balance, 2) . ')</option>'; 
         
         foreach($gatewayCurrency as $data){
-            $result .= '<option value="' . $data->method_code . '" data-gateway="' . $data . '">'. $data->name . '</option>';
+            // $result .= '<option value="' . $data->method_code . '" data-gateway="' . $data . '">'. $data->name . '</option>';
+            $result .= '<option value="' . $data->method_code . '">'. $data->name . '</option>';
         }
 
         $result .= '</select></div></div>';
@@ -211,6 +212,8 @@ class PaymentController extends Controller
     }
 
     public function fundWallet(){
+        // dd(phpinfo());
+        
         $pageTitle = 'Fund your Wallet';
         $user = auth()->user(); 
 
@@ -266,7 +269,7 @@ class PaymentController extends Controller
         $deposit = WalletHistory::where('trx', $track)->where('status',Status::PAYMENT_INITIATE)->orderBy('id', 'DESC')->with('gateway')->firstOrFail();
 
         if ($deposit->method_code >= 1000) {
-            return to_route('user.deposit.manual.confirm');
+            return to_route('user.wallet.manual.confirm');
         }
 
 
@@ -313,7 +316,7 @@ class PaymentController extends Controller
                 $adminNotification = new AdminNotification();
                 $adminNotification->user_id = $user->id;
                 $adminNotification->title = 'Wallet Payment successful via '.$deposit->gatewayCurrency()->name;
-                $adminNotification->click_url = '#';
+                $adminNotification->click_url = urlPath('admin.deposit.successful') . "?source=wallet";
                 $adminNotification->save();
             }
 
@@ -517,7 +520,7 @@ class PaymentController extends Controller
                 $adminNotification = new AdminNotification();
                 $adminNotification->user_id = $user->id;
                 $adminNotification->title = 'Payment successful via '.$deposit->gatewayCurrency()->name;
-                $adminNotification->click_url = urlPath('admin.deposit.successful');
+                $adminNotification->click_url = urlPath('admin.deposit.successful') . "?source=deposit";
                 $adminNotification->save();
             }
 
@@ -581,7 +584,7 @@ class PaymentController extends Controller
         $adminNotification = new AdminNotification();
         $adminNotification->user_id = $data->user->id;
         $adminNotification->title = 'Payment request from '.$data->user->username;
-        $adminNotification->click_url = urlPath('admin.deposit.details',$data->id);
+        $adminNotification->click_url = urlPath('admin.deposit.details',$data->id) . "?source=deposit";
         $adminNotification->save();
 
         notify($data->user, 'DEPOSIT_REQUEST', [
@@ -596,6 +599,64 @@ class PaymentController extends Controller
 
         $notify[] = ['success', 'You have payment request has been taken'];
         return to_route('user.deposit.history')->withNotify($notify);
+    }
+
+    public function manualDepositWalletConfirm()
+    {
+        $track = session()->get('Track');
+        $data = WalletHistory::with('gateway')->where('status', Status::PAYMENT_INITIATE)->where('trx', $track)->first();
+        if (!$data) {
+            return to_route(gatewayWalletRedirectUrl());
+        }
+        if ($data->method_code > 999) {
+
+            $pageTitle = 'Wallet Payment Confirm';
+            $method = $data->gatewayCurrency();
+            $gateway = $method->method;
+            return view($this->activeTemplate . 'user.payment.wallet.manual', compact('data', 'pageTitle', 'method','gateway'));
+        }
+        abort(404);
+    }
+
+    public function manualDepositWalletUpdate(Request $request)
+    {   
+        $track = session()->get('Track');
+        $data = WalletHistory::with('gateway')->where('status', Status::PAYMENT_INITIATE)->where('trx', $track)->first();
+        if (!$data) {
+            return to_route(gatewayWalletRedirectUrl());
+        }
+        $gatewayCurrency = $data->gatewayCurrency();
+        $gateway = $gatewayCurrency->method;
+        $formData = $gateway->form->form_data;
+
+        $formProcessor = new FormProcessor();
+        $validationRule = $formProcessor->valueValidation($formData);
+        $request->validate($validationRule);
+        $userData = $formProcessor->processFormData($request, $formData);
+
+
+        $data->detail = $userData;
+        $data->status = Status::PAYMENT_PENDING;
+        $data->save();
+
+        $adminNotification = new AdminNotification();
+        $adminNotification->user_id = $data->wallet->user->id;
+        $adminNotification->title = 'Wallet Payment request from '.$data->user->username;
+        $adminNotification->click_url = urlPath('admin.deposit.details',$data->id) . "?source=wallet";
+        $adminNotification->save();
+
+        notify($data->user, 'DEPOSIT_REQUEST', [
+            'method_name' => $data->gatewayCurrency()->name,
+            'method_currency' => $data->method_currency,
+            'method_amount' => showAmount($data->final_amo),
+            'amount' => showAmount($data->amount),
+            'charge' => showAmount($data->charge),
+            'rate' => showAmount($data->rate),
+            'trx' => $data->trx
+        ]);
+
+        $notify[] = ['success', 'You have payment request has been taken'];
+        return to_route('user.wallet.history')->withNotify($notify);
     }
 
 
