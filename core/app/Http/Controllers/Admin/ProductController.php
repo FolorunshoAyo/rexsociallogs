@@ -44,7 +44,7 @@ class ProductController extends Controller{
 
 	public function update(){
 
-		$this->formSubmit(update:true);
+		$this->formSubmit(true);
 
     	$notify[] = ['success', 'Product updated successfully'];
 	    return back()->withNotify($notify);
